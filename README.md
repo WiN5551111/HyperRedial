@@ -1,4 +1,4 @@
-﻿# HyperRedial — HyperOS 电话 App 通话记录点击逻辑改造 (LSPosed 模块)
+# HyperRedial — HyperOS 电话 App 通话记录点击逻辑改造 (LSPosed 模块)
 
 把小米/红米电话 App（`com.android.contacts`）的通话记录列表改成 **iOS 逻辑**：
 
@@ -174,13 +174,22 @@ App 升级后一眼能看出哪一项丢了。
 # app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Windows 上用 `gradlew.bat`。实测环境变量：
+Windows 上用 `gradlew.bat`：
 ```powershell
-$env:JAVA_HOME     = '%USERPROFILE%\.jdks\jbr-21.0.11'
-$env:ANDROID_HOME  = '%LOCALAPPDATA%\Android\Sdk'
-cd <项目目录>
+$env:JAVA_HOME    = "$env:USERPROFILE\.jdks\jbr-21.0.11"
+$env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+
+# debug 包
 .\gradlew.bat :app:assembleDebug
+
+# release 包（正式签名，需先跑 make-keystore.ps1）
+# 注意：PowerShell 里 -P 参数【必须加引号】，否则 1.0.0 里的
+# .0.0 会被当成另一个任务名，报 "Task '.0.0' not found"
+.\gradlew.bat :app:assembleRelease '-PversionName=1.0.0' '-PversionCode=1'
 ```
+
+> ⚠️ **这个引号坑踩过**：PowerShell 会把 `-PversionName=1.0.0` 按点号拆开，
+> 变成 `-PversionName=1` 和 `.0.0` 两个参数。**必须写成 `'-PversionName=1.0.0'`。**
 
 `local.properties`（不要提交到 git，Android Studio 会自动生成）：
 ```properties

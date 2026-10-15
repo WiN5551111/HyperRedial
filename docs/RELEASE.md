@@ -75,7 +75,7 @@ powershell -ExecutionPolicy Bypass -File .\make-keystore.ps1
 ```powershell
 cd E:\TEST\HyperRedial
 powershell -ExecutionPolicy Bypass -File .\make-keystore.ps1   # 只需一次
-.\gradlew.bat :app:assembleRelease -PversionName=1.0.0 -PversionCode=1
+.\gradlew.bat :app:assembleRelease '-PversionName=1.0.0' '-PversionCode=1'
 ```
 产物：`app\build\outputs\apk\release\HyperRedial-v1.0.0.apk`
 
@@ -150,7 +150,7 @@ apksigner verify --print-certs HyperRedial-v1.0.0.apk
 .\gradlew.bat :app:assembleDebug
 
 # 正式签名包（发版用）
-.\gradlew.bat :app:assembleRelease -PversionName=1.0.0 -PversionCode=1
+.\gradlew.bat :app:assembleRelease '-PversionName=1.0.0' '-PversionCode=1'
 
 # 产物位置
 #   debug:   app\build\outputs\apk\debug\app-debug.apk
@@ -166,6 +166,24 @@ apksigner verify --print-certs HyperRedial-v1.0.0.apk
 ---
 
 ## 常见问题
+
+**Q: 报 `Task '.0.0' not found in root project`？**
+A: PowerShell 把 `-PversionName=1.0.0` 按点号拆开了。**`-P` 参数必须加引号**：
+```powershell
+.\gradlew.bat :app:assembleRelease '-PversionName=1.0.0' '-PversionCode=1'
+```
+（cmd.exe 和 bash 没有这个问题，只有 PowerShell 会。）
+
+**Q: 报 `keystore password was incorrect` / `BadPaddingException`？**
+A: `-Force` 生成新密钥时会先删旧文件再建。如果旧文件还在，keytool 会尝试用
+**新密码**去打开它，于是解密失败。重跑一次 `make-keystore.ps1 -Force` 即可
+（现在的版本会先删后建）。
+
+**Q: `[IO.File]::ReadAllBytes("release.jks")` 报找不到文件？**
+A: .NET 静态方法用的是**进程工作目录**，不是你 `cd` 到的目录。传绝对路径：
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("E:\TEST\HyperRedial\release.jks")) | Set-Clipboard
+```
 
 **Q: 用户装不上 / 提示"应用未安装"？**
 A: 多半是签名不一致（之前装过 debug 签名的版本）。让用户先卸载旧版再装。
