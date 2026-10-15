@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:allowBackup="false"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true">
+
+        <!-- 告诉 LSPosed 这是一个 Xposed 模块 -->
+        <meta-data
+            android:name="xposedmodule"
+            android:value="true" />
+
+        <!-- 模块简介（显示在 LSPosed 管理器里） -->
+        <meta-data
+            android:name="xposeddescription"
+            android:value="通话记录改为 iOS 逻辑：点条目进详情，点右侧回拨按钮才拨号" />
+
+        <!-- 模块支持的最低 Xposed API 版本，82 = XposedBridge API 82 -->
+        <meta-data
+            android:name="xposedminversion"
+            android:value="82" />
+
+        <!--
+          注意：作用域不是在 Manifest 里声明的。
+          装好后请在 LSPosed 管理器里手动只勾选「电话」，见 README 第 5 节。
+        -->
+
+    </application>
+
+</manifest>

@@ -1,0 +1,25 @@
+# Gradle
+.gradle/
+build/
+app/build/
+
+# Local machine config (contains absolute SDK path - must not be committed)
+local.properties
+
+# Kotlin compiler scratch
+.kotlin/
+
+# IDE
+.idea/
+*.iml
+captures/
+
+# Signing & build outputs
+*.jks
+*.keystore
+*.apk
+*.aab
+
+# OS
+.DS_Store
+Thumbs.db

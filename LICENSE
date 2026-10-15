@@ -1,0 +1,37 @@
+MIT License
+
+Copyright (c) 2026 HyperRedial contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+## 说明 / Note
+
+本项目是一个针对小米/红米电话 App（`com.android.contacts`）的 LSPosed 模块，
+仅修改本机已安装应用的运行时行为，**不包含也不分发任何小米/红米的专有代码或资源**。
+
+项目的开发过程中对该 App 的 DEX/资源做了静态分析，以确定可挂钩的方法与视图。
+仓库中不包含被分析 APK 的任何内容，也不包含反编译产物。
+
+This project is an LSPosed module that modifies the runtime behaviour of an
+already-installed system app on the author's own device. It contains no
+proprietary code or resources from Xiaomi. Static analysis of the target APK
+was used only to locate hook points; no APK content or decompiled output is
+redistributed here.
