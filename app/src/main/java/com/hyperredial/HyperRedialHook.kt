@@ -347,6 +347,9 @@ class HyperRedialHook : IXposedHookLoadPackage {
     private fun applyDialIcon(button: View) {
         val icon = findIcon(button) ?: return
         val d = IconSwap.moduleDialIcon(button.context) ?: return
+        // 关键：必须上色。模块图标是纯黑 vector，深色模式下会完全看不见。
+        // IconSwap.applyTint 优先沿用按钮原有的 tint，拿不到就按明暗模式自动选黑白。
+        IconSwap.applyTint(icon)
         if (icon.drawable === d) return
         runCatching {
             icon.setImageDrawable(d)

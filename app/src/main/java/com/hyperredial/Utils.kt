@@ -6,6 +6,7 @@ import android.graphics.drawable.Drawable
 import android.view.TouchDelegate
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import java.lang.reflect.Method
@@ -69,11 +70,6 @@ object Reflect {
 }
 
 object Views {
-
-    /** 已经打过日志的 View，避免每次绑定时刷屏。 */
-    private val logOnce = java.util.Collections.newSetFromMap(
-        java.util.WeakHashMap<View, Boolean>()
-    )
 
     /** 收集 view 自身及其所有子孙的 id。 */
     fun collectIds(v: View?, out: MutableSet<Int>, depth: Int = 0) {
@@ -160,16 +156,16 @@ object Views {
                 out.bottom = minOf(out.bottom, parent.height)
 
                 if (out.width() <= rect.width() && out.height() <= rect.height()) {
-                    Log.i("hit area unchanged (already large enough): view=${target.id.toString(16)}")
                     return@runCatching
                 }
 
                 parent.touchDelegate = IosStyleTouchDelegate(out, rect, target)
+                // 注意：这里刻意不打日志。
+                // 每个可见行都会创建一个 ViewHolder，s0 绑定时各调一次，
+                // 在这个工具函数里打日志必然刷屏。日志交给调用方用
+                // "只打一次" 的开关处理（见 HyperRedialHook.applyHitArea）。
                 val desc = "view=${target.id.toString(16)} " +
                         "from=${rect.width()}x${rect.height()} to=${out.width()}x${out.height()}"
-                if (logOnce.add(target)) {
-                    Log.i("hit area expanded: $desc")
-                }
                 onDone?.invoke(desc)
             }.onFailure { Log.e("enlargeHitArea failed", it) }
         }
@@ -222,8 +218,9 @@ object Views {
 object IconSwap {
 
     private var cached: Drawable? = null
+    private var loggedTint = false
 
-    /** 取模块自带的 iOS 风格拨号图标。 */
+    /** 取模块自带的 iOS 风格拨号图标（未着色）。 */
     fun moduleDialIcon(hostContext: Context?): Drawable? {
         cached?.let { return it }
         val ctx = hostContext ?: return null
@@ -239,12 +236,64 @@ object IconSwap {
         return null
     }
 
+    /**
+     * 给图标上色，否则深色模式下纯黑图标会看不见。
+     *
+     * 取值优先顺序：
+     *   1. 沿用按钮原有的 tint（App 自己按主题设的，最贴合）
+     *   2. 主题里的 ?attr/colorControlNormal（跟随明暗自动变）
+     *   3. 按 Configuration.UI_MODE_NIGHT_YES 手选黑白
+     */
+    fun applyTint(icon: ImageView) {
+        // 注意：不要用 imageTintList == null 当"没设过"的判据 —— 它本来就可能为 null。
+        // 这里每次都重新套一遍，成本极低且幂等。
+        runCatching {
+            val existing = icon.imageTintList
+            if (existing != null) {
+                icon.imageTintList = existing
+                if (!loggedTint) {
+                    loggedTint = true
+                    Log.i("icon tint = existing (${existing.defaultColor.toString(16)})")
+                }
+                return
+            }
+
+            val ctx = icon.context ?: return
+            val tv = android.util.TypedValue()
+            val resolved = ctx.theme.resolveAttribute(
+                android.R.attr.colorControlNormal, tv, true
+            )
+            val color = when {
+                resolved && tv.type >= android.util.TypedValue.TYPE_FIRST_COLOR_INT &&
+                        tv.type <= android.util.TypedValue.TYPE_LAST_COLOR_INT -> tv.data
+
+                isNightMode(ctx) -> 0xFFFFFFFF.toInt()   // 深色模式 -> 白
+                else -> 0xFF000000.toInt()               // 浅色模式 -> 黑
+            }
+            icon.imageTintList = android.content.res.ColorStateList.valueOf(color)
+            if (!loggedTint) {
+                loggedTint = true
+                Log.i(
+                    "icon tint = theme/night (color=${color.toString(16)}" +
+                            ", night=${isNightMode(ctx)}, fromTheme=$resolved)"
+                )
+            }
+        }.onFailure { Log.e("applyTint failed", it) }
+    }
+
+    private fun isNightMode(ctx: Context): Boolean =
+        (ctx.resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+
     private fun load(host: Context, flags: Int): Drawable? = runCatching {
         val moduleCtx = host.createPackageContext(Targets.MODULE_PACKAGE, flags)
         val id = moduleCtx.resources.getIdentifier(
             "ic_redial_ios", "drawable", Targets.MODULE_PACKAGE
         )
         if (id == 0) return@runCatching null
-        moduleCtx.getDrawable(id)
+        // mutate()：让每个 ImageView 拿到独立的 drawable 实例，
+        // 避免共用同一个 cached 实例时 tint/state 互相影响。
+        moduleCtx.getDrawable(id)?.mutate()
     }.onFailure { Log.e("load module dial icon failed", it) }.getOrNull()
 }
