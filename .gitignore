@@ -6,6 +6,16 @@ app/build/
 # Local machine config (contains absolute SDK path - must not be committed)
 local.properties
 
+# Signing material - NEVER commit these
+keystore.properties
+release.jks
+*.jks
+*.keystore
+
+# Build outputs
+*.apk
+*.aab
+
 # Kotlin compiler scratch
 .kotlin/
 
@@ -13,12 +23,6 @@ local.properties
 .idea/
 *.iml
 captures/
-
-# Signing & build outputs
-*.jks
-*.keystore
-*.apk
-*.aab
 
 # OS
 .DS_Store

@@ -1,0 +1,143 @@
+name: Release
+
+# 触发方式（二选一）：
+#   1. 推送形如 v1.0.0 的 tag  -> 自动构建 + 创建 Release 并附上 APK
+#   2. 在 Actions 页面手动点 Run workflow（可选择只构建不发布）
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（不含 v 前缀），例如 1.0.0'
+        required: true
+        default: '1.0.0'
+
+permissions:
+  contents: write   # 创建 Release 需要
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK platform / build-tools
+        run: |
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" --sdk_root="$ANDROID_SDK_ROOT"
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # ── 版本号 ──
+      # tag 形如 v1.0.0 -> 1.0.0；手动触发则用输入值
+      - name: Resolve version
+        id: v
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            VER="${GITHUB_REF_NAME#v}"
+          else
+            VER="${{ github.event.inputs.version }}"
+          fi
+          echo "name=$VER" >> "$GITHUB_OUTPUT"
+          echo "code=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          echo "resolved version: $VER"
+
+      # ── 写入签名配置 ──
+      # 在仓库 Settings → Secrets and variables → Actions 里配置：
+      #   KEYSTORE_BASE64   release.jks 的 base64
+      #   KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD
+      # 若未配置，则退化为 debug 签名（仍会产出可安装的 APK）。
+      - name: Configure signing
+        run: |
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.jks
+            {
+              echo "storeFile=release.jks"
+              echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}"
+              echo "keyAlias=${{ secrets.KEY_ALIAS }}"
+              echo "keyPassword=${{ secrets.KEY_PASSWORD }}"
+            } > keystore.properties
+            echo "[i] using release keystore from secrets"
+          else
+            echo "[!] KEYSTORE_BASE64 secret not set - release build will be debug-signed"
+          fi
+
+      - name: Build release APK
+        run: |
+          ./gradlew :app:assembleRelease \
+            -PversionName=${{ steps.v.outputs.name }} \
+            -PversionCode=${{ steps.v.outputs.code }} \
+            --no-daemon --console=plain
+
+      - name: Collect APK
+        id: apk
+        run: |
+          SRC="app/build/outputs/apk/release/HyperRedial-v${{ steps.v.outputs.name }}.apk"
+          if [ ! -f "$SRC" ]; then
+            SRC=$(find app/build/outputs/apk/release -name '*.apk' | head -n1)
+          fi
+          DEST="HyperRedial-v${{ steps.v.outputs.name }}.apk"
+          cp "$SRC" "$DEST"
+          echo "path=$DEST" >> "$GITHUB_OUTPUT"
+          ls -l "$DEST"
+          # 打印签名信息，便于核验
+          APKSIGNER=$(find "$ANDROID_SDK_ROOT/build-tools" -name apksigner | sort | tail -n1)
+          "$APKSIGNER" verify --print-certs "$DEST" || true
+
+      - name: Upload as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HyperRedial-v${{ steps.v.outputs.name }}
+          path: ${{ steps.apk.outputs.path }}
+
+      - name: Create GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.apk.outputs.path }}
+          generate_release_notes: true
+          body: |
+            ## HyperRedial v${{ steps.v.outputs.name }}
+
+            把 HyperOS 电话 App 的通话记录列表改成 iOS 点击逻辑的 LSPosed 模块。
+
+            | 操作 | 行为 |
+            |---|---|
+            | 点通话记录**整行** | 打开详情页（原本是直接拨号） |
+            | 点**右侧按钮** | 拨号 / 回拨（原本是打开详情） |
+            | **长按**条目 | 保留 MIUI 原生菜单 |
+            | 右侧按钮图标 | iOS 风格听筒 |
+            | 右侧按钮热区 | 已放大 |
+
+            ### 安装
+            1. 下载下面的 `${{ steps.apk.outputs.path }}`
+            2. 安装后到 LSPosed 管理器启用，**作用域只勾「电话」**
+            3. 强制停止电话 App（或重启手机）
+
+            ### 适用环境
+            - HyperOS 4.0 / Android 17 (SDK 37)
+            - 电话 App `com.android.contacts` 18.30.00.55
+            - LSPosed v2.2.1+
+
+            其它版本可能类名不同，装好后看 logcat 里的 `HyperRedial selfTest` 日志即可判断。
