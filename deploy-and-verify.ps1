@@ -1,4 +1,4 @@
-﻿# HyperRedial one-click install + verify
+# HyperRedial one-click install + verify
 #
 # Purpose: after Android Studio produces the APK, run this script to
 #          install -> restart the Phone app -> capture logs -> decide pass/fail.
@@ -24,7 +24,9 @@ function Find-Adb {
     if ($env:ADB -and (Test-Path $env:ADB)) { return $env:ADB }
     $c = Get-Command adb -ErrorAction SilentlyContinue
     if ($c -and $c.Source) { return $c.Source }
-    foreach ($p in '<adb 路径>', "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe") {
+    foreach ($p in @(
+        (Join-Path $env:LOCALAPPDATA 'Android\Sdk\platform-tools\adb.exe')
+    )) {
         if (Test-Path $p) { return $p }
     }
     return $null

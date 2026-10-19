@@ -28,11 +28,11 @@ function Find-Git {
     if ($Hint -and (Test-Path $Hint)) { return $Hint }
     $c = Get-Command git -ErrorAction SilentlyContinue
     if ($c -and $c.Source) { return $c.Source }
+    # Common install locations; portable Git users should set $env:GIT or pass -Git.
     foreach ($p in @(
         'C:\Program Files\Git\cmd\git.exe',
         'C:\Program Files (x86)\Git\cmd\git.exe',
-        "$env:LOCALAPPDATA\Programs\Git\cmd\git.exe",
-        'D:\APP\PortableGit\cmd\git.exe'
+        (Join-Path $env:LOCALAPPDATA 'Programs\Git\cmd\git.exe')
     )) { if (Test-Path $p) { return $p } }
     return $null
 }
