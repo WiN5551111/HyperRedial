@@ -44,13 +44,13 @@
 | 项 | 值 |
 |---|---|
 | 机型 | Xiaomi 25113PN0EC (`pudding`) |
-| 系统 | HyperOS **OS4.0** / Android **17 (SDK 37)** |
-| 拨号器 | `com.android.contacts` **18.30.00.55** (versionCode 300055, targetSdk 36) |
+| 系统 | HyperOS **OS4.0.4.0.XPCCNXM** / Android **17 (SDK 37)** |
+| 拨号器 | `com.android.contacts` **18.30.00.60** (versionCode 300060, targetSdk 36) |
 | APK | `/product/priv-app/MIUIContactsT/MIUIContactsT.apk` |
 | 框架 | LSPosed **v2.2.1 (7912)** + KernelSU（已确认支持 Android 9~17）|
 
-> App 升级后类名/方法名可能变化。`app/src/main/java/com/hyperredial/Targets.kt`
-> 集中了全部逆向常量，升级后只需要改这一个文件。
+> 已在 **18.30.00.55** 和 **18.30.00.60** 两个版本上都实测通过。
+> 版本差异与适配方法见 [第 8 节「版本适配」](#8-版本适配)。
 
 ---
 
@@ -319,12 +319,101 @@ adb logcat | findstr /i "HyperRedial AndroidRuntime"
 
 1. **热区放大幅度是保守的**：实测按钮区域 `[1008,553]-[1220,681]` = 212×128px，
    高度已等于整行动作区高度，所以只**向左**扩了 8dp（→ 236×176），
-   避免与「点整行进详情」抢触摸。若你觉得偏小，告诉我目标尺寸，调
+   避免与「点整行进详情」抢触摸。若你觉得偏小，改
    `applyHitArea()` 里的 `extra` 即可。
-2. **图标**：模块自带黑色填充的 vector 听筒，直接 `setImageDrawable`。
-   若在你的主题下对比度不够，可改成套用原 `ImageView` 的 `imageTintList`。
+2. **图标着色**：模块自带纯黑 vector 听筒，靠 `IconSwap.applyTint()` 上色
+   （优先沿用按钮原 tint → 主题 `colorControlNormal` → 按明暗手选黑白），
+   深浅两种模式都已实测可见。若某主题下对比度仍不够，可改成写死某个颜色。
 3. **只改通话记录行**：`DialerContactVH`（联系人行）/ `DialerStrangerVH`（陌生号码行）未改动。
-4. **拨号不带 SIM 选择**：右键直接调 `DialerVHUtil.b`，双卡时会用 App 自己的默认/上次用过的卡。
-   如果需要每次都弹 SIM 选择，告诉我，改走 `DialerVHUtil.c` 那条路。
-5. App 升级后类名若变化，改 `Targets.kt` 即可；启动日志的 `selfTest`（当前 6 项）
-   会直接指出哪一项丢了。
+4. **拨号走 App 默认/上次用过的 SIM**：没有弹 SIM 选择。需要的话可以改走带卡选择的路径。
+5. 系统/App 升级后类名方法名若变化，改 `Targets.kt` 即可；启动日志的 `selfTest`
+   会直接指出哪一项丢了。详见下一节。
+
+---
+
+## 8. 版本适配
+
+小米会在系统更新里顺带升级电话 App，**方法名/签名可能变化**，模块就会静默失效
+（表现为"点了没反应"，日志里没有 `[HyperRedial]`）。本节记录已适配过的版本
+和排查方法。
+
+### 8.1 已适配的版本差异
+
+| 功能 | 18.30.00.55 (300055) | 18.30.00.60 (300060) |
+|---|---|---|
+| **拨号** | `DialerVHUtil.b(Context, DialerItemVM, String)` | `DialerVHUtil.e(Context, DialerItemVM, String)` |
+| 打开详情 | `DialerVHUtil.e(Context, DialerItemVM)` | `DialerVHUtil.g(Context, DialerItemVM)` |
+| `DialerCallVH.onClick(View)` | 不变 | 不变 |
+| `BaseVH.onClick(View)` | 不变 | 不变 |
+| `DialerCallVH.s0(DialerItemVM, DialerUISettings, ZZ)` | 不变 | 不变 |
+| `DialerCallVH.d0 : DialerItemVM` | 不变 | 不变 |
+| `DialerRecyclerAdapter.y` (事件名) / `.z` (Context) | 不变 | 不变 |
+| 按钮 id `0x7f0a04e0` | 不变 | 不变 |
+
+**代码已自适应**：`dial()` 会按 `e` → `b` 的顺序尝试，哪个存在就用哪个，
+两个版本都能工作。日志会明确打出实际命中哪一个：
+
+```
+[HyperRedial] dial via DialerVHUtil.e(Context,DialerItemVM,String) [新版]
+```
+
+### 8.2 怎么判定是哪个方法（不用逐个反编译）
+
+拨号和详情两个方法可以用**字符串特征**区分，搜 dex 里的常量即可：
+
+| 特征字符串 | 含义 |
+|---|---|
+| `key_click_calllog_redial` | 这个方法路径里含**拨号** |
+| `key_click_calllog_detail` | 这个方法路径里含**打开详情** |
+| `ContactsModuelUtil;->c(` | 真正发起呼叫（`CallIntentBuilder`） |
+| `vnd.android.cursor.item/contact` | 打开联系人详情 |
+
+### 8.3 升级后失效的排查顺序
+
+1. **先看模块有没有加载**
+   ```bash
+   adb logcat -c && adb shell am force-stop com.android.contacts
+   adb shell am start -n com.android.contacts/.activities.TwelveKeyDialer
+   adb logcat | findstr HyperRedial
+   ```
+   - **一条日志都没有** → 不是代码问题，见 8.4（LSPosed 路径失效）
+   - 有 `selfTest: N/M targets OK` 且 N<M → 看紧跟的 `selfTest: MISSING -> xxx`
+
+2. **对着新 APK 核验挂钩点**
+   ```bash
+   # 拉出当前 APK
+   adb shell pm path com.android.contacts
+   adb pull <上面输出的路径> dialer.apk
+   ```
+   然后解开看 `classes*.dex` 里 `DialerVHUtil` 还有哪些方法：
+   ```text
+   # 用本仓库用过的思路：列出 DialerVHUtil 的全部方法签名
+   # 关注形如 (Context, DialerItemVM, String)V 的那几个，
+   # 再按 8.2 的字符串特征判断哪个是拨号、哪个是详情
+   ```
+
+3. **改 `Targets.kt` 里的常量**，重新编译安装即可。
+
+### 8.4 更新 APK 后模块不加载（很常见）
+
+Android 每次（重新）安装都会把 APK 放到**新的** `data/app` 目录：
+
+```
+/data/app/~~NKd7WGd8DFHbqXnk83JpPQ==/com.hyperredial-.../base.apk
+/data/app/~~wQ6pH9JXarazVV4szVwREA==/com.hyperredial-.../base.apk   <- 更新后
+```
+
+而 LSPosed 的数据库里记的是**绝对路径**，旧路径失效后模块就加载不了。
+现象是"模块明明装着，但 logcat 里一条 `[HyperRedial]` 都没有"。
+
+**两种解法（任选其一）**：
+
+**A. 用仓库里的脚本（推荐，自动重启并验证）**
+```powershell
+powershell -ExecutionPolicy Bypass -File .\fix-lsposed-path.ps1
+```
+
+**B. 手动**
+打开 LSPosed 管理器 → 模块 → 把 HyperRedial 的开关**关一下再打开** →
+然后 `adb shell am force-stop com.android.contacts`。
+（LSPosed 会重新读取 apk 路径。）
