@@ -25,17 +25,49 @@ $ErrorActionPreference = 'Continue'
 
 function Find-Git {
     param([string]$Hint)
+    # 1) explicit hint
     if ($Hint -and (Test-Path $Hint)) { return $Hint }
+    # 2) $env:GIT
+    if ($env:GIT -and (Test-Path $env:GIT)) { return $env:GIT }
+    # 3) PATH
     $c = Get-Command git -ErrorAction SilentlyContinue
     if ($c -and $c.Source) { return $c.Source }
-    # Common install locations; portable Git users should set $env:GIT or pass -Git.
+    # 4) standard installer locations
     foreach ($p in @(
-        'C:\Program Files\Git\cmd\git.exe',
-        'C:\Program Files (x86)\Git\cmd\git.exe',
+        (Join-Path $env:ProgramFiles 'Git\cmd\git.exe'),
+        (Join-Path ${env:ProgramFiles(x86)} 'Git\cmd\git.exe'),
         (Join-Path $env:LOCALAPPDATA 'Programs\Git\cmd\git.exe')
-    )) { if (Test-Path $p) { return $p } }
+    )) { if ($p -and (Test-Path $p)) { return $p } }
+    # 5) portable Git (PortableGit* folder 1-2 levels below a drive root or a tools dir).
+    #    This is generic - it does not hardcode any machine-specific path.
+    $roots = @($env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:LOCALAPPDATA)
+    foreach ($d in (Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)) {
+        if ($d.Root) { $roots += $d.Root.TrimEnd('\') }
+    }
+    foreach ($root in ($roots | Where-Object { $_ } | Select-Object -Unique)) {
+        if (-not (Test-Path $root)) { continue }
+        # depth 1: <root>\PortableGit\cmd\git.exe
+        foreach ($dir in (Get-ChildItem -Path $root -Filter 'PortableGit*' -Directory -ErrorAction SilentlyContinue)) {
+            $p = Join-Path $dir.FullName 'cmd\git.exe'
+            if (Test-Path $p) { return $p }
+        }
+        # depth 2: <root>\<appdir>\PortableGit\cmd\git.exe  (e.g. D:\Tools\PortableGit)
+        foreach ($sub in (Get-ChildItem -Path $root -Directory -ErrorAction SilentlyContinue)) {
+            if ($sub.Name -match '^(Windows|Program Files.*|Users|System Volume.*|Recovery|PerfLogs)$') { continue }
+            foreach ($dir in (Get-ChildItem -Path $sub.FullName -Filter 'PortableGit*' -Directory -ErrorAction SilentlyContinue)) {
+                $p = Join-Path $dir.FullName 'cmd\git.exe'
+                if (Test-Path $p) { return $p }
+            }
+        }
+    }
     return $null
 }
+
+# Work from the repository root.
+# Why: PowerShell's `cd` only changes the *PowerShell* location, not the process
+# working directory, so native git.exe can end up running in the wrong folder and
+# fail with "fatal: not a git repository".
+Set-Location -LiteralPath $PSScriptRoot
 
 $git = Find-Git -Hint $Git
 if (-not $git) {
