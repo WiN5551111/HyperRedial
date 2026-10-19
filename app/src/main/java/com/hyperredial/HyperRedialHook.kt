@@ -63,6 +63,7 @@ class HyperRedialHook : IXposedHookLoadPackage {
     @Volatile private var loggedFirstDial = false
     @Volatile private var loggedFirstIcon = false
     @Volatile private var loggedFirstHitArea = false
+    @Volatile private var loggedDialTarget = false
 
     /** 递归保护：模拟点击详情按钮打开详情时，避免再次进入按钮分支。 */
     @Volatile private var inDetailOpen = false
@@ -258,16 +259,36 @@ class HyperRedialHook : IXposedHookLoadPackage {
         }
         val loader = item.javaClass.classLoader ?: return false
         val utilCls = Reflect.classOrNull(loader, Targets.CLS_DIALER_VH_UTIL) ?: return false
-        val m = Reflect.methodOrNull(
-            utilCls, Targets.M_DIAL, Context::class.java, item.javaClass, String::class.java
-        ) ?: run {
-            Log.e("DialerVHUtil.b(Context, DialerItemVM, String) not found")
-            return false
-        }
         val event = (adapter?.let { Reflect.readField(it, "y") } as? String) ?: ""
-        return runCatching { m.invoke(null, ctx, item, event) }
-            .onFailure { Log.e("DialerVHUtil.b threw", it) }
-            .isSuccess
+
+        // 签名在 App 版本之间变过，按顺序试，谁在就用谁：
+        //   18.30.00.60+ : e(Context, DialerItemVM, String)   实测 = 拨号
+        //   18.30.00.55  : b(Context, DialerItemVM, String)   旧版拨号
+        val candidates = listOf(
+            Targets.M_DIAL_NEW to "e(Context,DialerItemVM,String) [新版]",
+            Targets.M_DIAL to "b(Context,DialerItemVM,String) [旧版]"
+        )
+        for ((name, label) in candidates) {
+            val m = Reflect.methodOrNull(
+                utilCls, name, Context::class.java, item.javaClass, String::class.java
+            ) ?: continue
+            val ok = runCatching { m.invoke(null, ctx, item, event) }
+                .onFailure { Log.e("$label threw", it) }
+                .isSuccess
+            if (ok) {
+                if (!loggedDialTarget) {
+                    loggedDialTarget = true
+                    Log.i("dial via DialerVHUtil.$label")
+                }
+                return true
+            }
+        }
+        Log.e(
+            "dial: 没有可用的拨号方法（试过 " +
+                    candidates.joinToString { it.first } + "）。" +
+                    "App 可能又改了方法名，见 README「版本适配」"
+        )
+        return false
     }
 
     /**
@@ -419,22 +440,42 @@ class HyperRedialHook : IXposedHookLoadPackage {
         val vm = Reflect.classOrNull(loader, Targets.CLS_DIALER_ITEM_VM)
         val uiSettings = Reflect.classOrNull(loader, Targets.CLS_DIALER_UI_SETTINGS)
 
-        results += "DialerCallVH" to (callVh != null)
-        results += "BaseVH.onClick(View)" to
-                (Reflect.methodOrNull(baseVh, Targets.M_ON_CLICK, View::class.java) != null)
-        results += "DialerCallVH.onClick(View)" to
-                (Reflect.methodOrNull(callVh, Targets.M_ON_CLICK, View::class.java) != null)
-        results += "DialerCallVH.s0(...)" to
-                (Reflect.methodOrNull(
-                    callVh, Targets.M_BIND, vm, uiSettings,
-                    Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType
-                ) != null)
-        results += "DialerVHUtil.e(Context,DialerItemVM)" to
-                (Reflect.methodOrNull(util, Targets.M_OPEN_DETAIL, Context::class.java, vm) != null)
-        results += "DialerVHUtil.b(Context,DialerItemVM,String) [拨号]" to
-                (Reflect.methodOrNull(
-                    util, Targets.M_DIAL, Context::class.java, vm, String::class.java
-                ) != null)
+        // 每一项都单独兜底：某一条抛出异常不能让整个自检中断
+        // （早期版本就因为 methodOrNull 的 NPE 让 selfTest 直接崩在中间）
+        fun check(label: String, block: () -> Boolean) {
+            val ok = runCatching(block).getOrDefault(false)
+            results += label to ok
+        }
+
+        check("DialerCallVH") { callVh != null }
+        check("BaseVH.onClick(View)") {
+            Reflect.methodOrNull(baseVh, Targets.M_ON_CLICK, View::class.java) != null
+        }
+        check("DialerCallVH.onClick(View)") {
+            Reflect.methodOrNull(callVh, Targets.M_ON_CLICK, View::class.java) != null
+        }
+        check("DialerCallVH.s0(...)") {
+            Reflect.methodOrNull(
+                callVh, Targets.M_BIND, vm, uiSettings,
+                Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType
+            ) != null
+        }
+        // 拨号方法：新版 e(...) 或旧版 b(...)，任一存在即算通过
+        check("DialerVHUtil 拨号方法 (e/b + String)") {
+            Reflect.methodOrNull(
+                util, Targets.M_DIAL_NEW, Context::class.java, vm, String::class.java
+            ) != null || Reflect.methodOrNull(
+                util, Targets.M_DIAL, Context::class.java, vm, String::class.java
+            ) != null
+        }
+        // 详情入口：新版 g(...) 或旧版 e(...)，仅作参考
+        check("DialerVHUtil 详情方法 (g/e)") {
+            Reflect.methodOrNull(util, Targets.M_OPEN_DETAIL_NEW, Context::class.java, vm) != null ||
+                    Reflect.methodOrNull(
+                        util, Targets.M_OPEN_DETAIL, Context::class.java, vm, String::class.java
+                    ) != null ||
+                    Reflect.methodOrNull(util, Targets.M_OPEN_DETAIL, Context::class.java, vm) != null
+        }
 
         val pass = results.count { it.second }
         Log.i("selfTest: $pass/${results.size} targets OK")

@@ -31,8 +31,17 @@ object Log {
 
 object Reflect {
 
-    /** 已解析方法缓存，避免每次点击都做反射查找。 */
-    private val methodCache = ConcurrentHashMap<String, Method?>()
+    /**
+     * 已解析方法缓存，避免每次点击都做反射查找。
+     *
+     * ⚠️ 注意：只能用非 null 值填这个 map。
+     * ConcurrentHashMap 不允许 null 值，而 getOrPut 的 lambda 一旦返回 null
+     * 就会在内部执行 put(key, null) 并抛 NullPointerException。
+     * 早期版本正是踩了这个坑：方法找不到时 NPE 被上层 try/catch 吞掉，
+     * 表现为"点了没反应"（selfTest 里则直接中断整个自检）。
+     * 所以找不到结果时**不写缓存**。
+     */
+    private val methodCache = ConcurrentHashMap<String, Method>()
 
     fun classOrNull(loader: ClassLoader, name: String): Class<*>? =
         runCatching { XposedHelpers.findClassIfExists(name, loader) }.getOrNull()
@@ -40,16 +49,24 @@ object Reflect {
     /**
      * 查找精确签名的静态/实例方法。
      *
-     * 参数类型声明为可空：调用方经常是从 findClassIfExists 拿到的 Class<*>?，
-     * 传进来后由 findMethodExactIfExists 自己在运行时判空/报错，
-     * 这样调用点不必到处写 !!。
+     * 参数类型声明为可空：调用方经常是从 findClassIfExists 拿到的 Class<*>?。
      */
     fun methodOrNull(cls: Class<*>?, name: String, vararg paramTypes: Class<*>?): Method? {
         if (cls == null) return null
-        val key = cls.name + "#" + name + paramTypes.joinToString(",") { it?.name ?: "null" }
-        return methodCache.getOrPut(key) {
-            runCatching { XposedHelpers.findMethodExactIfExists(cls, name, *paramTypes) }.getOrNull()
+        // 只缓存"命中"的结果；未命中不缓存（避免上面说的 null 值问题）
+        if (paramTypes.any { it == null }) {
+            // 有 null 类型参数时无法拼出确定 key，直接查、不缓存
+            return runCatching {
+                XposedHelpers.findMethodExactIfExists(cls, name, *paramTypes)
+            }.getOrNull()
         }
+        val key = cls.name + "#" + name + paramTypes.joinToString(",") { it!!.name }
+        methodCache[key]?.let { return it }
+        val found = runCatching {
+            XposedHelpers.findMethodExactIfExists(cls, name, *paramTypes)
+        }.getOrNull() ?: return null
+        methodCache[key] = found
+        return found
     }
 
     /**

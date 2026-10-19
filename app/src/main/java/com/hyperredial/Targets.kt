@@ -100,14 +100,31 @@ object Targets {
     /** OnItemViewClickedListener.a(I)V —— 整行点击回调（带 position） */
     const val M_ON_ITEM_CLICKED = "a"
 
-    /** DialerVHUtil.e(Context, DialerItemVM)V —— 打开联系人详情（App 自带入口） */
+    /**
+     * 打开联系人详情。
+     *
+     * ⚠️ 版本差异（App 更新后改过，实测确证）：
+     *   18.30.00.55: e(Context, DialerItemVM)
+     *   18.30.00.60: g(Context, DialerItemVM)   —— 含 ACTION_VIEW +
+     *                "vnd.android.cursor.item/contact" + "key_click_calllog_detail"
+     *
+     * 本模块目前**不直接调用**它（走"模拟点详情按钮"的路径更稳），保留常量备用。
+     */
     const val M_OPEN_DETAIL = "e"
+    const val M_OPEN_DETAIL_NEW = "g"
 
     /**
-     * DialerVHUtil.b(Context, DialerItemVM, String)V —— 发起回拨（真正的拨号）。
-     * 第三个参数是"事件来源"字符串（埋点用），从 adapter 的 y 字段取。
+     * 发起回拨（真正的拨号）。
+     *
+     * ⚠️ 版本差异（App 更新后方法被重命名/加重载，实测确证）：
+     *   18.30.00.55: b(Context, DialerItemVM, String)   <- 旧
+     *   18.30.00.60: e(Context, DialerItemVM, String)   <- 新（原来的 e 变成了详情）
+     *
+     * 新版 e 的实测特征：构造 ICallsUtilInterface$CallIntentBuilder
+     * -> ContactsModuelUtil.c(builder, ctx)，并埋点 "key_click_calllog_redial"。
      */
     const val M_DIAL = "b"
+    const val M_DIAL_NEW = "e"
 
     /** DialerListItemSecondaryAction.getDetailActionView()ImageView; */
     const val M_GET_DETAIL_ACTION_VIEW = "getDetailActionView"
