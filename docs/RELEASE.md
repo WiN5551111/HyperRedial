@@ -23,15 +23,15 @@
 仓库里已有 `.github/workflows/release.yml`。你只需要：
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.1.4
+git push origin v1.1.4
 ```
 
 然后 GitHub Actions 会自动：
 1. 装 JDK 17 + Android SDK 36
 2. 用 Secrets 里的密钥签名
 3. 编译 release APK
-4. **创建一个 Release**，把 `HyperRedial-v1.0.0.apk` 挂上去，并自动生成 release notes
+4. **创建一个 Release**，把 `HyperRedial-v1.1.4.apk` 挂上去，并自动生成 release notes
 
 去 https://github.com/WiN5551111/HyperRedial/actions 看进度，
 完成后在 https://github.com/WiN5551111/HyperRedial/releases 就能看到。
@@ -75,26 +75,26 @@ powershell -ExecutionPolicy Bypass -File .\make-keystore.ps1
 ```powershell
 cd E:\TEST\HyperRedial
 powershell -ExecutionPolicy Bypass -File .\make-keystore.ps1   # 只需一次
-.\gradlew.bat :app:assembleRelease '-PversionName=1.0.0' '-PversionCode=1'
+.\gradlew.bat :app:assembleRelease '-PversionName=1.1.4' '-PversionCode=8'
 ```
-产物：`app\build\outputs\apk\release\HyperRedial-v1.0.0.apk`
+产物：`app\build\outputs\apk\release\HyperRedial-v1.1.4.apk`
 
 **2. 在网页上发 Release**
 打开 https://github.com/WiN5551111/HyperRedial/releases/new
 
-- **Choose a tag**: 输入 `v1.0.0` → 点 "Create new tag on publish"
-- **Release title**: `HyperRedial v1.0.0`
+- **Choose a tag**: 输入 `v1.1.4` → 点 "Create new tag on publish"
+- **Release title**: `HyperRedial v1.1.4`
 - **Describe this release**: 写更新说明（可以直接抄下面「Release 说明模板」）
-- **Attach binaries**: 把 `HyperRedial-v1.0.0.apk` 拖进去
+- **Attach binaries**: 把 `HyperRedial-v1.1.4.apk` 拖进去
 - 点 **Publish release**
 
 > 只有「Publish release」之后附件才会公开可下载；存成 draft 只有你自己看得到。
 
 **3. 命令行等价做法**（如果你装了 `gh` CLI）
 ```bash
-gh release create v1.0.0 \
-  "app/build/outputs/apk/release/HyperRedial-v1.0.0.apk" \
-  --title "HyperRedial v1.0.0" \
+gh release create v1.1.4 \
+  "app/build/outputs/apk/release/HyperRedial-v1.1.4.apk" \
+  --title "HyperRedial v1.1.4" \
   --notes-file CHANGELOG.md
 ```
 
@@ -110,7 +110,7 @@ gh release create v1.0.0 \
 ## Release 说明模板
 
 ```markdown
-## HyperRedial v1.0.0
+## HyperRedial v1.1.4
 
 把 HyperOS 电话 App 的通话记录列表改成 iOS 点击逻辑的 LSPosed 模块。
 
@@ -118,9 +118,15 @@ gh release create v1.0.0 \
 |---|---|
 | 点通话记录**整行** | 打开详情页（原本是直接拨号） |
 | 点**右侧按钮** | 拨号 / 回拨（原本是打开详情） |
-| **长按**条目 | 保留 MIUI 原生菜单 |
-| 右侧按钮图标 | iOS 风格听筒 |
-| 右侧按钮热区 | 已放大 |
+| **长按**条目 / 长按图标 | 保留 MIUI 原生菜单 |
+| 右侧按钮图标 | 与联系人详情页同款的绿色圆盘听筒，浅色/深色两套配色 |
+| 右侧按钮热区 | 收敛到圆圈本身（39dp / 120px），圈外按"点整行"处理 |
+| 右侧按钮按压 | **涟漪只画在圆圈里，整行不再一起高亮** |
+
+### 本次更新（1.1.4）
+- 按压反馈改为**只在按钮圆圈内**：原来点回拨按钮时整行会一起亮，现在只有圆圈泛起涟漪
+- 圈内长按仍然交回宿主，MIUI 原生菜单不受影响
+- 涟漪色跟随 `colorControlHighlight`，切浅色/深色主题自动重新着色
 
 ### 安装
 1. 下载下面的 APK
@@ -129,14 +135,14 @@ gh release create v1.0.0 \
 
 ### 适用环境
 - HyperOS 4.0 / Android 17 (SDK 37)
-- 电话 App `com.android.contacts` 18.30.00.55
+- 电话 App `com.android.contacts` 18.30.00.55 / 18.30.00.60
 - LSPosed v2.2.1+
 
 其它版本可能类名不同，装好后看 logcat 里的 `HyperRedial selfTest` 日志即可判断。
 
 ### 校验签名（可选）
 ```bash
-apksigner verify --print-certs HyperRedial-v1.0.0.apk
+apksigner verify --print-certs HyperRedial-v1.1.4.apk
 # 应显示 CN=HyperRedial, OU=OpenSource, O=HyperRedial, C=CN
 ```
 ```
@@ -150,15 +156,15 @@ apksigner verify --print-certs HyperRedial-v1.0.0.apk
 .\gradlew.bat :app:assembleDebug
 
 # 正式签名包（发版用）
-.\gradlew.bat :app:assembleRelease '-PversionName=1.0.0' '-PversionCode=1'
+.\gradlew.bat :app:assembleRelease '-PversionName=1.1.4' '-PversionCode=8'
 
 # 产物位置
 #   debug:   app\build\outputs\apk\debug\app-debug.apk
-#   release: app\build\outputs\apk\release\HyperRedial-v1.0.0.apk
+#   release: app\build\outputs\apk\release\HyperRedial-v1.1.4.apk
 
 # 验证签名
 & "$env:LOCALAPPDATA\Android\Sdk\build-tools\36.0.0\apksigner.bat" verify --print-certs `
-    app\build\outputs\apk\release\HyperRedial-v1.0.0.apk
+    app\build\outputs\apk\release\HyperRedial-v1.1.4.apk
 ```
 
 `versionCode` 必须**每次发版递增**，否则 Android 不允许覆盖安装。
@@ -170,7 +176,7 @@ apksigner verify --print-certs HyperRedial-v1.0.0.apk
 **Q: 报 `Task '.0.0' not found in root project`？**
 A: PowerShell 把 `-PversionName=1.0.0` 按点号拆开了。**`-P` 参数必须加引号**：
 ```powershell
-.\gradlew.bat :app:assembleRelease '-PversionName=1.0.0' '-PversionCode=1'
+.\gradlew.bat :app:assembleRelease '-PversionName=1.1.4' '-PversionCode=8'
 ```
 （cmd.exe 和 bash 没有这个问题，只有 PowerShell 会。）
 

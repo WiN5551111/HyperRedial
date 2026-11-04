@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#eef0f3;font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;padding:28px 32px 36px}
+  .wrap{display:flex;gap:26px;align-items:flex-start}
+  .panel{border-radius:18px;overflow:hidden;box-shadow:0 6px 28px rgba(0,0,0,.10);width:392px}
+  .lt{background:#fff;color:#000}
+  .dk{background:#000;color:#fff}
+  .hdr{font-size:11px;letter-spacing:.4px;padding:12px 18px 6px;opacity:.5;font-weight:600}
+  .row{display:flex;align-items:center;height:72px;padding:0 16px;position:relative}
+  .row+.row{border-top:1px solid rgba(0,0,0,.07)}
+  .dk .row+.row{border-top-color:rgba(255,255,255,.10)}
+  .av{width:40px;height:40px;border-radius:50%;background:#dfe3e8;color:#5b6570;font-size:15px;
+      display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .dk .av{background:#2a2d31;color:#c9ccd1}
+  .info{flex:1;min-width:0;padding-left:14px}
+  .nm{font-size:16px;font-weight:500;line-height:1.25}
+  .sub{font-size:12px;opacity:.5;margin-top:3px;display:flex;gap:6px;align-items:center}
+  .ico{flex:0 0 auto;width:24px;height:24px;display:flex;align-items:center;justify-content:center;position:relative}
+  .ico svg{width:24px;height:24px;display:block}
+  .caption{padding:10px 18px 16px;font-size:11px;opacity:.55;line-height:1.5}
+
+  /* 热区示意 */
+  .diagram{width:520px;background:#fff;border-radius:18px;padding:20px 22px 18px;box-shadow:0 6px 28px rgba(0,0,0,.10)}
+  .dtitle{font-size:12px;font-weight:600;opacity:.65;margin-bottom:14px}
+  .zone{position:relative;width:100%;height:186px;border-radius:14px;background:#f6f8fa;border:1px solid #e3e7ec}
+  .rowline{position:absolute;left:14px;right:14px;top:93px;height:1px;background:#e9edf1}
+  .btn{position:absolute;right:28px;top:29px;width:130px;height:128px;border-radius:12px;
+       border:1.5px dashed #c8ced6;background:transparent}
+  .btlabel{position:absolute;right:18px;top:34px;width:150px;text-align:center;
+           font-size:9px;color:#a8b0ba;white-space:nowrap}
+  .hit{position:absolute;right:67px;top:67px;width:52px;height:52px;border-radius:50%;
+       background:rgba(52,130,255,.12);border:1.5px solid #3482ff;
+       display:flex;align-items:center;justify-content:center}
+  .hit svg{width:24px;height:24px}
+  .num{position:absolute;width:16px;height:16px;border-radius:50%;background:#3482ff;color:#fff;
+       font-size:10px;display:flex;align-items:center;justify-content:center;font-weight:600}
+  .num.gray{background:#aeb6c0}
+  .n1{right:52px;top:50px}
+  .n2{right:148px;top:56px}
+  .lbl{position:absolute;font-size:11px;color:#5d6672;white-space:nowrap}
+  .l1{right:28px;top:126px;width:130px;text-align:center;color:#1f6fe0;font-weight:600}
+  .l2{left:34px;top:66px}
+  .legend{font-size:11.5px;color:#657080;line-height:1.9;margin-top:12px}
+  .k{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:1px}
+</style></head>
+<body>
+<div class="wrap">
+
+  <div class="panel lt">
+    <div class="hdr">通话记录 · 浅色</div>
+    <div class="row">
+      <div class="av">张</div>
+      <div class="info"><div class="nm">张三</div><div class="sub">138 0000 1234 · 今天 14:20</div></div>
+      <div class="ico">
+        <svg viewBox="0 0 24 24" fill="none"><path fill="#ECF9ED" d="M12,2.05a9.95,9.95 0 1,1 0,19.9a9.95,9.95 0 1,1 0,-19.9z"/><path fill="#61CA51" d="M9.439,11.424C10.124,12.771 11.229,13.871 12.576,14.561L13.624,13.514C13.752,13.385 13.943,13.343 14.109,13.400C14.642,13.576 15.219,13.671 15.809,13.671C16.071,13.671 16.285,13.885 16.285,14.147L16.285,15.809C16.285,16.071 16.071,16.285 15.809,16.285C11.338,16.285 7.715,12.662 7.715,8.191C7.715,7.929 7.929,7.715 8.191,7.715L9.857,7.715C10.119,7.715 10.334,7.929 10.334,8.191C10.334,8.786 10.429,9.358 10.605,9.891C10.657,10.057 10.619,10.243 10.486,10.376L9.439,11.424Z"/></svg>
+      </div>
+    </div>
+    <div class="row">
+      <div class="av">李</div>
+      <div class="info"><div class="nm">李四</div><div class="sub">10086 · 昨天 09:02</div></div>
+      <div class="ico">
+        <svg viewBox="0 0 24 24" fill="none"><path fill="#ECF9ED" d="M12,2.05a9.95,9.95 0 1,1 0,19.9a9.95,9.95 0 1,1 0,-19.9z"/><path fill="#61CA51" d="M9.439,11.424C10.124,12.771 11.229,13.871 12.576,14.561L13.624,13.514C13.752,13.385 13.943,13.343 14.109,13.400C14.642,13.576 15.219,13.671 15.809,13.671C16.071,13.671 16.285,13.885 16.285,14.147L16.285,15.809C16.285,16.071 16.071,16.285 15.809,16.285C11.338,16.285 7.715,12.662 7.715,8.191C7.715,7.929 7.929,7.715 8.191,7.715L9.857,7.715C10.119,7.715 10.334,7.929 10.334,8.191C10.334,8.786 10.429,9.358 10.605,9.891C10.657,10.057 10.619,10.243 10.486,10.376L9.439,11.424Z"/></svg>
+      </div>
+    </div>
+    <div class="caption">图标 24dp：照「联系人详情页」那颗按钮 1:1 复刻 —— 淡绿底盘 ⌀19.9（#ECF9ED）+ 绿听筒（#61CA51），听筒包围盒 = 盘径的 0.43，居中</div>
+  </div>
+
+  <div class="panel dk">
+    <div class="hdr">通话记录 · 深色</div>
+    <div class="row">
+      <div class="av">张</div>
+      <div class="info"><div class="nm">张三</div><div class="sub">138 0000 1234 · 今天 14:20</div></div>
+      <div class="ico">
+        <svg viewBox="0 0 24 24" fill="none"><path fill="#283528" d="M12,2.05a9.95,9.95 0 1,1 0,19.9a9.95,9.95 0 1,1 0,-19.9z"/><path fill="#66CF59" d="M9.439,11.424C10.124,12.771 11.229,13.871 12.576,14.561L13.624,13.514C13.752,13.385 13.943,13.343 14.109,13.400C14.642,13.576 15.219,13.671 15.809,13.671C16.071,13.671 16.285,13.885 16.285,14.147L16.285,15.809C16.285,16.071 16.071,16.285 15.809,16.285C11.338,16.285 7.715,12.662 7.715,8.191C7.715,7.929 7.929,7.715 8.191,7.715L9.857,7.715C10.119,7.715 10.334,7.929 10.334,8.191C10.334,8.786 10.429,9.358 10.605,9.891C10.657,10.057 10.619,10.243 10.486,10.376L9.439,11.424Z"/></svg>
+      </div>
+    </div>
+    <div class="row">
+      <div class="av">李</div>
+      <div class="info"><div class="nm">李四</div><div class="sub">10086 · 昨天 09:02</div></div>
+      <div class="ico">
+        <svg viewBox="0 0 24 24" fill="none"><path fill="#283528" d="M12,2.05a9.95,9.95 0 1,1 0,19.9a9.95,9.95 0 1,1 0,-19.9z"/><path fill="#66CF59" d="M9.439,11.424C10.124,12.771 11.229,13.871 12.576,14.561L13.624,13.514C13.752,13.385 13.943,13.343 14.109,13.400C14.642,13.576 15.219,13.671 15.809,13.671C16.071,13.671 16.285,13.885 16.285,14.147L16.285,15.809C16.285,16.071 16.071,16.285 15.809,16.285C11.338,16.285 7.715,12.662 7.715,8.191C7.715,7.929 7.929,7.715 8.191,7.715L9.857,7.715C10.119,7.715 10.334,7.929 10.334,8.191C10.334,8.786 10.429,9.358 10.605,9.891C10.657,10.057 10.619,10.243 10.486,10.376L9.439,11.424Z"/></svg>
+      </div>
+    </div>
+    <div class="caption">深色主题换 drawable-night：#283528 底盘 + #66CF59 听筒，跟着系统深浅色自动切</div>
+  </div>
+
+  <div class="diagram">
+    <div class="dtitle">响应范围：只有圆圈算拨号</div>
+    <div class="zone">
+      <div class="rowline"></div>
+      <div class="btn"></div>
+      <div class="btlabel">旧热区：整个按钮 215×128px</div>
+      <div class="hit">
+        <svg viewBox="0 0 24 24" fill="none"><path fill="#ECF9ED" d="M12,2.05a9.95,9.95 0 1,1 0,19.9a9.95,9.95 0 1,1 0,-19.9z"/><path fill="#61CA51" d="M9.439,11.424C10.124,12.771 11.229,13.871 12.576,14.561L13.624,13.514C13.752,13.385 13.943,13.343 14.109,13.400C14.642,13.576 15.219,13.671 15.809,13.671C16.071,13.671 16.285,13.885 16.285,14.147L16.285,15.809C16.285,16.071 16.071,16.285 15.809,16.285C11.338,16.285 7.715,12.662 7.715,8.191C7.715,7.929 7.929,7.715 8.191,7.715L9.857,7.715C10.119,7.715 10.334,7.929 10.334,8.191C10.334,8.786 10.429,9.358 10.605,9.891C10.657,10.057 10.619,10.243 10.486,10.376L9.439,11.424Z"/></svg>
+      </div>
+      <div class="num n1">1</div>
+      <div class="num gray n2">2</div>
+      <div class="lbl l1">图标内 → 拨号</div>
+      <div class="lbl l2">图标外（含按钮空白）→ 打开详情</div>
+    </div>
+    <div class="legend">
+      <div><span class="k" style="background:#3482ff"></span>命中圆圈：走 DialerVHUtil 回拨</div>
+      <div><span class="k" style="background:#dfe3e8;border:1px dashed #c8ced6"></span>其余区域：走原生整行点击 → 详情页</div>
+    </div>
+  </div>
+
+</div>
+</body></html>
