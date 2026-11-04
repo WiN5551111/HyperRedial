@@ -5,11 +5,23 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-// ── 版本号：优先取 -PversionName= / -PversionCode=，否则用下面的默认值 ──
-// 发版时这两行要跟 git tag 保持一致，这样不带 -P 直接 assembleRelease
-// 出来的包也是对的版本号。
+// ── 版本号 ──
+// versionName 优先取 -PversionName=，否则用下面的默认值（发版时跟 git tag 保持一致）。
+// versionCode 默认由 versionName 推导，规则：major*10000 + minor*100 + patch，
+// 例如 1.1.4 -> 10104。这样打 tag 发版时 CI 不用额外传一个自增数字，而且**永远不会倒退**。
+//
+// ⚠️ 以前 CI 用 github.run_number 当 versionCode，结果只有个位数，
+//    比本地已经装上的版本号还小，装的时候直接 INSTALL_FAILED_VERSION_DOWNGRADE。
+//    要覆盖任何历史版本（≤1.0.x 的 3、1.1.x 的 8），推导值必须保持这个量级。
 val appVersionName: String = (project.findProperty("versionName") as String?) ?: "1.1.4"
-val appVersionCode: Int = ((project.findProperty("versionCode") as String?) ?: "8").toInt()
+
+fun versionCodeOf(name: String): Int {
+    val nums = name.substringBefore('-').split('.').map { it.toIntOrNull() ?: 0 }
+    return nums.getOrElse(0) { 0 } * 10000 + nums.getOrElse(1) { 0 } * 100 + nums.getOrElse(2) { 0 }
+}
+
+val appVersionCode: Int = (project.findProperty("versionCode") as String?)?.toInt()
+    ?: versionCodeOf(appVersionName)
 
 // ── 签名信息查找 ──
 // 刻意不使用 java.util.Properties：在 Kotlin DSL 里 `java` 会被解析成 Gradle 的

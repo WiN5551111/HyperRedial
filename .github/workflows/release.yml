@@ -30,12 +30,28 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      # ubuntu-latest 镜像自带 Android SDK（ANDROID_SDK_ROOT=/usr/local/lib/android/sdk），
+      # 直接用 runner 里那套就行。
+      #
+      # 这里原来用的是 android-actions/setup-android@v3，从 2026-10-15 起每次都
+      # 挂在 "Setup Android SDK" 这一步（v3 已停止维护，下载 cmdline-tools 的地址失效），
+      # 后面所有步骤全部 skipped，Release 建出来是空的（v1.0.2 就是这样）。
+      - name: Locate Android SDK
+        run: |
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          if [ ! -d "$SDK" ]; then echo "找不到 Android SDK: $SDK"; exit 1; fi
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "SDK = $SDK"
 
       - name: Install SDK platform / build-tools
         run: |
-          sdkmanager "platforms;android-36" "build-tools;36.0.0" --sdk_root="$ANDROID_SDK_ROOT"
+          SM="$(ls -d "$ANDROID_SDK_ROOT"/cmdline-tools/*/bin 2>/dev/null | head -n1)"
+          if [ -z "$SM" ]; then echo "找不到 sdkmanager"; exit 1; fi
+          export PATH="$SM:$ANDROID_SDK_ROOT/platform-tools:$PATH"
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          # compileSdk 36 / buildToolsVersion 36.0.0（见 app/build.gradle.kts）
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
       - name: Cache Gradle
         uses: actions/cache@v4
@@ -60,8 +76,10 @@ jobs:
             VER="${{ github.event.inputs.version }}"
           fi
           echo "name=$VER" >> "$GITHUB_OUTPUT"
-          echo "code=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
           echo "resolved version: $VER"
+          # versionCode 交给 gradle 从 versionName 推导（1.1.4 -> 10104），
+          # 不再用 github.run_number —— 那个是个位数，会比设备上已装的版本还小，
+          # 装的时候直接 INSTALL_FAILED_VERSION_DOWNGRADE。
 
       # ── 写入签名配置 ──
       # 在仓库 Settings → Secrets and variables → Actions 里配置：
@@ -87,7 +105,6 @@ jobs:
         run: |
           ./gradlew :app:assembleRelease \
             -PversionName=${{ steps.v.outputs.name }} \
-            -PversionCode=${{ steps.v.outputs.code }} \
             --no-daemon --console=plain
 
       - name: Collect APK
@@ -126,9 +143,10 @@ jobs:
             |---|---|
             | 点通话记录**整行** | 打开详情页（原本是直接拨号） |
             | 点**右侧按钮** | 拨号 / 回拨（原本是打开详情） |
-            | **长按**条目 | 保留 MIUI 原生菜单 |
-            | 右侧按钮图标 | iOS 风格听筒 |
-            | 右侧按钮热区 | 已放大 |
+            | **长按**条目 | 保留 MIUI 原生菜单（完全不拦截） |
+            | 右侧按钮图标 | 详情页同款「淡绿圆盘 + 绿听筒」，深色主题单独一份 |
+            | 右侧按钮热区 | **只有圆圈本身**，圈外一律按"点整行"处理 |
+            | 按压动画 | **只出现在圆圈内**，不再整行高亮 |
 
             ### 安装
             1. 下载下面的 `${{ steps.apk.outputs.path }}`
@@ -137,7 +155,7 @@ jobs:
 
             ### 适用环境
             - HyperOS 4.0 / Android 17 (SDK 37)
-            - 电话 App `com.android.contacts` 18.30.00.55
+            - 电话 App `com.android.contacts` 18.30.00.60
             - LSPosed v2.2.1+
 
             其它版本可能类名不同，装好后看 logcat 里的 `HyperRedial selfTest` 日志即可判断。

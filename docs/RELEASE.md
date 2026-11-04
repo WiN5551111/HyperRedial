@@ -75,7 +75,7 @@ powershell -ExecutionPolicy Bypass -File .\make-keystore.ps1
 ```powershell
 cd E:\TEST\HyperRedial
 powershell -ExecutionPolicy Bypass -File .\make-keystore.ps1   # 只需一次
-.\gradlew.bat :app:assembleRelease '-PversionName=1.1.4' '-PversionCode=8'
+.\gradlew.bat :app:assembleRelease '-PversionName=1.1.4'
 ```
 产物：`app\build\outputs\apk\release\HyperRedial-v1.1.4.apk`
 
@@ -156,7 +156,7 @@ apksigner verify --print-certs HyperRedial-v1.1.4.apk
 .\gradlew.bat :app:assembleDebug
 
 # 正式签名包（发版用）
-.\gradlew.bat :app:assembleRelease '-PversionName=1.1.4' '-PversionCode=8'
+.\gradlew.bat :app:assembleRelease '-PversionName=1.1.4'
 
 # 产物位置
 #   debug:   app\build\outputs\apk\debug\app-debug.apk
@@ -167,7 +167,9 @@ apksigner verify --print-certs HyperRedial-v1.1.4.apk
     app\build\outputs\apk\release\HyperRedial-v1.1.4.apk
 ```
 
-`versionCode` 必须**每次发版递增**，否则 Android 不允许覆盖安装。
+`versionCode` 由 `versionName` 自动推导（`major*10000 + minor*100 + patch`，
+1.1.4 → 10104），不需要手动递增，也永远不会比设备上已装的版本小。
+确实要指定时再传 `-PversionCode=`，会覆盖推导值。
 
 ---
 
@@ -176,7 +178,7 @@ apksigner verify --print-certs HyperRedial-v1.1.4.apk
 **Q: 报 `Task '.0.0' not found in root project`？**
 A: PowerShell 把 `-PversionName=1.0.0` 按点号拆开了。**`-P` 参数必须加引号**：
 ```powershell
-.\gradlew.bat :app:assembleRelease '-PversionName=1.1.4' '-PversionCode=8'
+.\gradlew.bat :app:assembleRelease '-PversionName=1.1.4'
 ```
 （cmd.exe 和 bash 没有这个问题，只有 PowerShell 会。）
 
