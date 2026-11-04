@@ -8,8 +8,8 @@ plugins {
 // ── 版本号：优先取 -PversionName= / -PversionCode=，否则用下面的默认值 ──
 // 发版时这两行要跟 git tag 保持一致，这样不带 -P 直接 assembleRelease
 // 出来的包也是对的版本号。
-val appVersionName: String = (project.findProperty("versionName") as String?) ?: "1.0.2"
-val appVersionCode: Int = ((project.findProperty("versionCode") as String?) ?: "3").toInt()
+val appVersionName: String = (project.findProperty("versionName") as String?) ?: "1.1.4"
+val appVersionCode: Int = ((project.findProperty("versionCode") as String?) ?: "8").toInt()
 
 // ── 签名信息查找 ──
 // 刻意不使用 java.util.Properties：在 Kotlin DSL 里 `java` 会被解析成 Gradle 的
