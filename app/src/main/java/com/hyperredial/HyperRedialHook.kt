@@ -35,6 +35,9 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage
  *   右侧按钮图标    → iOS 风格「圆圈 + 听筒」(ic_redial_ios)，颜色跟随 HyperOS 主题
  *   右侧按钮热区    → **收敛到圆圈本身**：圈外一律当成"点整行"（详情），不再外扩
  *   右侧按钮按压    → **涟漪只画在圆圈里**，不再整行高亮
+ *   右侧按钮防误触  → 位置对了还要过一道 AntiMistouch：
+ *                    刚挂断 3s 内 / 被遮挡（兜里、扣在桌上）/ 多指 / 蹭一下就抬，
+ *                    这几种一律吞掉不拨（详见 AntiMistouch.kt）
  *
  * ══════════════ 实测确证的调用链 ══════════════
  *
@@ -187,8 +190,19 @@ class HyperRedialHook : IXposedHookLoadPackage {
                     // 吃掉原生"整行拨号"
                     param.result = null
 
-                    // 落点在圆圈里 -> 拨号；否则继续走详情
-                    if (isTapOnIcon(holder) && dialFromRow(holder)) return
+                    // 落点在圆圈里 -> 拨号（再过一道防误触：万一按钮那次没接住这次手势，
+                    // 比如某版布局把按钮移出了触摸路径，这里补拦，避免整行路径绕过去）
+                    if (isTapOnIcon(holder)) {
+                        val guard = (tapped?.context ?: hostContext)?.let {
+                            runCatching { AntiMistouch.of(it) }.getOrNull()
+                        }
+                        val blocked = runCatching { guard?.blockReason() }.getOrNull()
+                        if (blocked != null) {
+                            guard?.noteBlocked("$blocked（整行兜底路径）")
+                            return
+                        }
+                        if (dialFromRow(holder)) return
+                    }
 
                     if (!loggedFirstRowClick) {
                         loggedFirstRowClick = true
@@ -558,8 +572,13 @@ class HyperRedialHook : IXposedHookLoadPackage {
         //    这一次 DOWN 就不会再往上分发给整行 —— HyperCellLayout 收不到
         //    DOWN 就不会进入 pressed 状态，整行那层涟漪/高亮也就不会画出来。
         //    圈外返回 false，事件照旧冒泡，整行该有的反馈一点不少。
+        //
+        //    d) 防误触守卫也挂在这里：位置对了不代表这一下该算数
+        //    （刚挂断、被遮挡、多指……），被拦时同样是"吞掉"，
+        //    不能放行 —— 放行会冒泡到整行，而整行点击判中图标照样会拨。
         val row = Views.findById(itemView, Targets.ID_ROW_CONTAINER) ?: itemView
-        button.setOnTouchListener(IconPressTouch(button, icon, row, itemView))
+        val guard = AntiMistouch.of(button.context).also { it.start() }
+        button.setOnTouchListener(IconPressTouch(button, icon, row, itemView, guard))
 
         // d) 兜底：万一某版布局让按钮不在触摸路径上（收不到 DOWN），
         //    仍按"落点是否在圈里"来判定。这一段只旁观不消费，返回 false。
@@ -602,7 +621,8 @@ class HyperRedialHook : IXposedHookLoadPackage {
         private val button: View,
         private val icon: ImageView?,
         private val row: View,
-        private val itemView: View
+        private val itemView: View,
+        private val guard: AntiMistouch
     ) : View.OnTouchListener {
 
         private var active = false
@@ -610,6 +630,12 @@ class HyperRedialHook : IXposedHookLoadPackage {
         private var longPressed = false
         private var downX = 0f
         private var downY = 0f
+
+        /** 按下时刻（uptimeMillis），用来判断是不是"蹭一下就抬"。 */
+        private var downAt = 0L
+
+        /** 这一串事件已经被防误触吞掉了：整段返回 true，不拨也不冒泡。 */
+        private var swallowing = false
 
         private val longPressRunnable = Runnable {
             if (!active || canceled) return@Runnable
@@ -626,15 +652,37 @@ class HyperRedialHook : IXposedHookLoadPackage {
 
         override fun onTouch(v: View, e: MotionEvent): Boolean {
             return try {
+                // 已经决定吞掉这次手势：整段照单全收，直到手指抬起/取消。
+                if (swallowing) {
+                    if (e.actionMasked == MotionEvent.ACTION_UP ||
+                        e.actionMasked == MotionEvent.ACTION_CANCEL
+                    ) {
+                        swallowing = false
+                    }
+                    return true
+                }
+
                 when (e.actionMasked) {
                     MotionEvent.ACTION_DOWN -> {
                         active = false
                         canceled = false
                         longPressed = false
                         if (!inside(e)) return false      // 圈外：交回整行
+
+                        // ★ 防误触：位置对了，但未必该算数
+                        //   （刚挂断 / 被遮挡 / 多指 —— 详见 AntiMistouch）
+                        val blocked = guard.ghostReason(e) ?: guard.blockReason()
+                        if (blocked != null) {
+                            guard.noteBlocked(blocked)
+                            swallowing = true
+                            setPressed(false)
+                            return true
+                        }
+
                         active = true
                         downX = e.rawX
                         downY = e.rawY
+                        downAt = android.os.SystemClock.uptimeMillis()
                         setPressed(true)
                         uiHandler.postDelayed(
                             longPressRunnable,
@@ -658,12 +706,29 @@ class HyperRedialHook : IXposedHookLoadPackage {
                         true
                     }
 
+                    // 第一根手指落下后又贴上来一根（手掌/握持）—— 这不是"点一下"，
+                    // 立刻作废，否则手掌按压会被当成正常点击拨出去。
+                    MotionEvent.ACTION_POINTER_DOWN -> {
+                        if (!active) return false
+                        uiHandler.removeCallbacks(longPressRunnable)
+                        setPressed(false)
+                        canceled = true
+                        guard.noteBlocked("多指按下 pointerCount=${e.pointerCount}（手掌？）")
+                        true
+                    }
+
                     MotionEvent.ACTION_UP -> {
                         if (!active) return false
                         active = false
                         uiHandler.removeCallbacks(longPressRunnable)
                         setPressed(false)
                         if (!canceled && !longPressed && inside(e)) {
+                            // 蹭一下就抬：不像是故意的，按幽灵触点丢掉
+                            val duration = android.os.SystemClock.uptimeMillis() - downAt
+                            if (guard.isTooShort(duration)) {
+                                guard.noteBlocked("按压仅 ${duration}ms（疑似蹭到）")
+                                return true
+                            }
                             // 复用宿主自己的 onClick（hook 里已把它改成拨号），
                             // 这样点击音效、无障碍语义都不用我们操心。
                             v.performClick()

@@ -13,7 +13,7 @@ plugins {
 // ⚠️ 以前 CI 用 github.run_number 当 versionCode，结果只有个位数，
 //    比本地已经装上的版本号还小，装的时候直接 INSTALL_FAILED_VERSION_DOWNGRADE。
 //    要覆盖任何历史版本（≤1.0.x 的 3、1.1.x 的 8），推导值必须保持这个量级。
-val appVersionName: String = (project.findProperty("versionName") as String?) ?: "1.1.4"
+val appVersionName: String = (project.findProperty("versionName") as String?) ?: "1.1.5"
 
 fun versionCodeOf(name: String): Int {
     val nums = name.substringBefore('-').split('.').map { it.toIntOrNull() ?: 0 }
